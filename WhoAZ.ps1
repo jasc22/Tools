@@ -45,25 +45,42 @@ if ($groupMemberships) {
     Write-Host "User $($User.UserPrincipalName) is not a member of any groups."
 }
 
-    # Get Azure AD role assignments
+    # Get role assignments using AzureADDirectoryRole and AzureADDirectoryRoleMember
     Write-Host "`n---------------"
     Write-Host "Assigned Roles"
     Write-Host "----------------`n"
-    if ($user) {
-    $userId = $user.ObjectId
-    Get-AzureADDirectoryRole | ForEach-Object {
-        $roleName = $_.DisplayName
-        $roleMembers = Get-AzureADDirectoryRoleMember -ObjectId $_.ObjectId -ErrorAction SilentlyContinue
-        $userRole = $roleMembers | Where-Object { $_.ObjectId -eq $userId }
-        if ($userRole) {
-            Write-Host "Azure AD Role Name: $roleName"
-            Write-Host "Azure ADObject Type: $($userRole.ObjectType)"
-            Write-Host ""
+    
+    #Code was shamelessly borrowed from mgeeky's AzureRT
+    $Coll = New-Object System.Collections.ArrayList
+    $count = 0
+    
+    Get-AzureADDirectoryRole | foreach { 
+        $members = Get-AzureADDirectoryRoleMember -ObjectId $_.ObjectId
+        
+        $RoleName = $_.DisplayName
+        $RoleId = $_.ObjectId
+    
+        $members | foreach { 
+            $obj = [PSCustomObject]@{
+                DisplayName      = $_.DisplayName
+                AssignedRoleName = $RoleName
+                AccountEnabled   = $_.AccountEnabled
+                ObjectId         = $_.ObjectId
+                AssignedRoleId   = $RoleId
+            }
+    
+            if ($_.ObjectId -eq $($user.ObjectId)) {
+                $null = $Coll.Add($obj)
+                $count += 1
+            }
         }
     }
-} else {
-    Write-Host "User with UserPrincipalName '$userPrincipalName' not found."
-}
+    
+    $Coll
+    
+    if($count -eq 0) {
+        Write-Host "[-] No Azure AD Role assignment found on current user." -ForegroundColor Red
+    }
 
     # Get administrative unit memberships
     $adminUnitMemberships = Get-AzureADMSAdministrativeUnit | ForEach-Object { $AUDisplayName=$_.DisplayName; $AUDesc=$_.Description; Get-AzureADMSScopedRoleMembership -Id $_.Id | ForEach-Object { $DisplayNameR=$_.RoleMemberInfo.DisplayName; $IdR=$_.RoleMemberInfo.Id; Get-AzureADDirectoryRole -ObjectId $_.RoleId | ForEach-Object { "$($AUDisplayName),$($AUDesc),$($DisplayNameR),$($IdR),$ADDirRole=$($_.DisplayName),ADDirDesc=$($_.Description)" } } }
@@ -81,9 +98,9 @@ if ($groupMemberships) {
 
     # Get Azure resources
     $resources = Get-AzResource
-    Write-Host "`n------------------------------------------------------------------------------------------"
+    Write-Host "`n------------------------------------------------------------------------------"
     Write-Host "$($User.UserPrincipalName) has access to the following Azure resources"
-    Write-Host "--------------------------------------------------------------------------------------------`n"
+    Write-Host "-------------------------------------------------------------------------------`n"
 
     #Iterate over each resource for the current account and print
     foreach ($resource in $resources) {
