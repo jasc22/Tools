@@ -1,0 +1,1 @@
+Get-AzureADDirectoryRole | ForEach-Object { $roleName = $_.DisplayName; Get-AzureADDirectoryRoleMember -ObjectId $_.ObjectId | Select-Object @{Name = 'RoleName'; Expression={$roleName}}, DisplayName, ObjectType, ObjectId, UserPrincipalName } | ft -AutoSize
