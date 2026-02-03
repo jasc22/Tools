@@ -176,10 +176,9 @@ function Send-ToAwsS3 {
     $objectKey = "${Method}_${FileSize}.txt" -replace '[^a-zA-Z0-9_.]', '_'
     $uri = "$AwsBucket/$objectKey"
 
-    # AWS S3 headers for public bucket
+    # AWS S3 headers for presigned URL
     $headers = @{
-        "Content-Type" = "application/octet-stream"
-        "x-amz-acl"    = "public-read"
+        "Content-Type" = "text/plain"
     }
 
     return Invoke-Upload -Provider "AWS S3" -Method $Method -FilePath $FilePath `
@@ -197,10 +196,9 @@ function Send-ToGcp {
     $encodedName = [System.Uri]::EscapeDataString($objectName)
     $uri = "$GcpBucket/$encodedName"
 
-    # GCP Cloud Storage headers for public bucket
+    # GCP Cloud Storage headers for signed URL
     $headers = @{
-        "Content-Type" = "application/octet-stream"
-        "x-goog-acl"   = "public-read"
+        "Content-Type" = "text/plain"
     }
 
     return Invoke-Upload -Provider "GCP" -Method $Method -FilePath $FilePath `
