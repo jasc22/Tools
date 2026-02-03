@@ -14,7 +14,8 @@ param(
     [string]$AzureContainer = "https://mystorageaccount.blob.core.windows.net/container?sv=2021-06-08&ss=b&srt=o&sp=rwdlacx&se=...",
     [string]$AwsBucket = "https://my-public-bucket.s3.us-east-1.amazonaws.com",
     [string]$GcpBucket = "https://storage.googleapis.com/my-public-bucket",
-    [string]$FileDirectory = "C:\TestFiles"
+    [string]$FileDirectory = "C:\TestFiles",
+    [int]$TimeoutSeconds = 1800
 )
 
 # File paths
@@ -49,7 +50,8 @@ function Invoke-Upload {
         [string]$FileSize,
         [string]$Uri,
         [hashtable]$Headers,
-        [string]$HttpMethod = "PUT"
+        [string]$HttpMethod = "PUT",
+        [int]$Timeout = $script:TimeoutSeconds
     )
 
     $fileName = Split-Path $FilePath -Leaf
@@ -59,6 +61,7 @@ function Invoke-Upload {
     Write-Log "File: $fileName ($fileSizeBytes bytes)"
     Write-Log "Target URI: $Uri"
     Write-Log "Headers: $($Headers | ConvertTo-Json -Compress)"
+    Write-Log "Timeout: $Timeout seconds"
 
     $startTime = Get-Date
     Write-Log "Upload started"
@@ -66,7 +69,7 @@ function Invoke-Upload {
     try {
         switch ($Method) {
             "Invoke-WebRequest" {
-                $response = Invoke-WebRequest -Method $HttpMethod -Headers $Headers -InFile $FilePath -Uri $Uri -UseBasicParsing
+                $response = Invoke-WebRequest -Method $HttpMethod -Headers $Headers -InFile $FilePath -Uri $Uri -UseBasicParsing -TimeoutSec $Timeout
                 $statusCode = $response.StatusCode
             }
             "curl" {
@@ -76,11 +79,11 @@ function Invoke-Upload {
                     $headerArgs += "-H"
                     $headerArgs += "${key}: $($Headers[$key])"
                 }
-                $result = & curl.exe -X $HttpMethod --data-binary "@$FilePath" @headerArgs "$Uri" -w "%{http_code}" -s -o NUL
+                $result = & curl.exe -X $HttpMethod --data-binary "@$FilePath" @headerArgs "$Uri" -w "%{http_code}" -s -o NUL --max-time $Timeout
                 $statusCode = [int]$result
             }
             "iwr" {
-                $response = iwr -Method $HttpMethod -Headers $Headers -InFile $FilePath -Uri $Uri -UseBasicParsing
+                $response = iwr -Method $HttpMethod -Headers $Headers -InFile $FilePath -Uri $Uri -UseBasicParsing -TimeoutSec $Timeout
                 $statusCode = $response.StatusCode
             }
             "wget" {
@@ -89,15 +92,15 @@ function Invoke-Upload {
                 foreach ($key in $Headers.Keys) {
                     $headerArgs += "--header=${key}: $($Headers[$key])"
                 }
-                & wget.exe --method=$HttpMethod --body-file="$FilePath" @headerArgs "$Uri" -q -O NUL 2>$null
+                & wget.exe --method=$HttpMethod --body-file="$FilePath" @headerArgs "$Uri" -q -O NUL --timeout=$Timeout 2>$null
                 $statusCode = if ($LASTEXITCODE -eq 0) { 200 } else { $LASTEXITCODE }
             }
             "Invoke-RestMethod" {
-                Invoke-RestMethod -Method $HttpMethod -Headers $Headers -InFile $FilePath -Uri $Uri
+                Invoke-RestMethod -Method $HttpMethod -Headers $Headers -InFile $FilePath -Uri $Uri -TimeoutSec $Timeout
                 $statusCode = 200
             }
             "irm" {
-                irm -Method $HttpMethod -Headers $Headers -InFile $FilePath -Uri $Uri
+                irm -Method $HttpMethod -Headers $Headers -InFile $FilePath -Uri $Uri -TimeoutSec $Timeout
                 $statusCode = 200
             }
         }
