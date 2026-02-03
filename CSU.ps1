@@ -69,6 +69,8 @@ function Invoke-Upload {
     try {
         switch ($Method) {
             "Invoke-WebRequest" {
+                $headerStr = ($Headers.GetEnumerator() | ForEach-Object { "`"$($_.Key)`" = `"$($_.Value)`"" }) -join "; "
+                Write-Log "Command: Invoke-WebRequest -Method $HttpMethod -Headers @{$headerStr} -InFile `"$FilePath`" -Uri `"$Uri`" -UseBasicParsing -TimeoutSec $Timeout"
                 $response = Invoke-WebRequest -Method $HttpMethod -Headers $Headers -InFile $FilePath -Uri $Uri -UseBasicParsing -TimeoutSec $Timeout
                 $statusCode = $response.StatusCode
             }
@@ -79,10 +81,14 @@ function Invoke-Upload {
                     $headerArgs += "-H"
                     $headerArgs += "${key}: $($Headers[$key])"
                 }
+                $headerStr = ($Headers.GetEnumerator() | ForEach-Object { "-H `"$($_.Key): $($_.Value)`"" }) -join " "
+                Write-Log "Command: curl.exe -X $HttpMethod --data-binary `"@$FilePath`" $headerStr `"$Uri`" --max-time $Timeout"
                 $result = & curl.exe -X $HttpMethod --data-binary "@$FilePath" @headerArgs "$Uri" -w "%{http_code}" -s -o NUL --max-time $Timeout
                 $statusCode = [int]$result
             }
             "iwr" {
+                $headerStr = ($Headers.GetEnumerator() | ForEach-Object { "`"$($_.Key)`" = `"$($_.Value)`"" }) -join "; "
+                Write-Log "Command: iwr -Method $HttpMethod -Headers @{$headerStr} -InFile `"$FilePath`" -Uri `"$Uri`" -UseBasicParsing -TimeoutSec $Timeout"
                 $response = iwr -Method $HttpMethod -Headers $Headers -InFile $FilePath -Uri $Uri -UseBasicParsing -TimeoutSec $Timeout
                 $statusCode = $response.StatusCode
             }
@@ -92,14 +98,20 @@ function Invoke-Upload {
                 foreach ($key in $Headers.Keys) {
                     $headerArgs += "--header=${key}: $($Headers[$key])"
                 }
+                $headerStr = ($Headers.GetEnumerator() | ForEach-Object { "--header=`"$($_.Key): $($_.Value)`"" }) -join " "
+                Write-Log "Command: wget.exe --method=$HttpMethod --body-file=`"$FilePath`" $headerStr `"$Uri`" --timeout=$Timeout"
                 & wget.exe --method=$HttpMethod --body-file="$FilePath" @headerArgs "$Uri" -q -O NUL --timeout=$Timeout 2>$null
                 $statusCode = if ($LASTEXITCODE -eq 0) { 200 } else { $LASTEXITCODE }
             }
             "Invoke-RestMethod" {
+                $headerStr = ($Headers.GetEnumerator() | ForEach-Object { "`"$($_.Key)`" = `"$($_.Value)`"" }) -join "; "
+                Write-Log "Command: Invoke-RestMethod -Method $HttpMethod -Headers @{$headerStr} -InFile `"$FilePath`" -Uri `"$Uri`" -TimeoutSec $Timeout"
                 Invoke-RestMethod -Method $HttpMethod -Headers $Headers -InFile $FilePath -Uri $Uri -TimeoutSec $Timeout
                 $statusCode = 200
             }
             "irm" {
+                $headerStr = ($Headers.GetEnumerator() | ForEach-Object { "`"$($_.Key)`" = `"$($_.Value)`"" }) -join "; "
+                Write-Log "Command: irm -Method $HttpMethod -Headers @{$headerStr} -InFile `"$FilePath`" -Uri `"$Uri`" -TimeoutSec $Timeout"
                 irm -Method $HttpMethod -Headers $Headers -InFile $FilePath -Uri $Uri -TimeoutSec $Timeout
                 $statusCode = 200
             }
