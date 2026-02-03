@@ -19,9 +19,9 @@ param(
 
 # File paths
 $Files = @{
-    "5MB"  = Join-Path $FileDirectory "test_5mb.bin"
-    "10MB" = Join-Path $FileDirectory "test_10mb.bin"
-    "1GB"  = Join-Path $FileDirectory "test_1gb.bin"
+    "5MB"  = Join-Path $FileDirectory "test_5mb.txt"
+    "10MB" = Join-Path $FileDirectory "test_10mb.txt"
+    "1GB"  = Join-Path $FileDirectory "test_1gb.txt"
 }
 
 function Get-Timestamp {
@@ -53,8 +53,7 @@ function Invoke-Upload {
     )
 
     $fileName = Split-Path $FilePath -Leaf
-    $fileBytes = [System.IO.File]::ReadAllBytes($FilePath)
-    $fileSizeBytes = $fileBytes.Length
+    $fileSizeBytes = (Get-Item $FilePath).Length
 
     Write-Log "=== $Provider Upload: $FileSize using $Method ===" -Level "START"
     Write-Log "File: $fileName ($fileSizeBytes bytes)"
@@ -67,27 +66,27 @@ function Invoke-Upload {
     try {
         switch ($Method) {
             "Invoke-WebRequest" {
-                $response = Invoke-WebRequest -Uri $Uri -Method $HttpMethod -Headers $Headers -Body $fileBytes -UseBasicParsing
+                $response = Invoke-WebRequest -Uri $Uri -Method $HttpMethod -Headers $Headers -InFile $FilePath -UseBasicParsing
                 $statusCode = $response.StatusCode
             }
             "curl" {
-                $response = curl -Uri $Uri -Method $HttpMethod -Headers $Headers -Body $fileBytes -UseBasicParsing
+                $response = curl -Uri $Uri -Method $HttpMethod -Headers $Headers -InFile $FilePath -UseBasicParsing
                 $statusCode = $response.StatusCode
             }
             "iwr" {
-                $response = iwr -Uri $Uri -Method $HttpMethod -Headers $Headers -Body $fileBytes -UseBasicParsing
+                $response = iwr -Uri $Uri -Method $HttpMethod -Headers $Headers -InFile $FilePath -UseBasicParsing
                 $statusCode = $response.StatusCode
             }
             "wget" {
-                $response = wget -Uri $Uri -Method $HttpMethod -Headers $Headers -Body $fileBytes -UseBasicParsing
+                $response = wget -Uri $Uri -Method $HttpMethod -Headers $Headers -InFile $FilePath -UseBasicParsing
                 $statusCode = $response.StatusCode
             }
             "Invoke-RestMethod" {
-                Invoke-RestMethod -Uri $Uri -Method $HttpMethod -Headers $Headers -Body $fileBytes
+                Invoke-RestMethod -Uri $Uri -Method $HttpMethod -Headers $Headers -InFile $FilePath
                 $statusCode = 200
             }
             "irm" {
-                irm -Uri $Uri -Method $HttpMethod -Headers $Headers -Body $fileBytes
+                irm -Uri $Uri -Method $HttpMethod -Headers $Headers -InFile $FilePath
                 $statusCode = 200
             }
         }
@@ -133,7 +132,7 @@ function Invoke-Upload {
 function Send-ToAzure {
     param([string]$FilePath, [string]$FileSize, [string]$Method)
 
-    $blobName = "${Method}_${FileSize}.bin" -replace '[^a-zA-Z0-9_.]', '_'
+    $blobName = "${Method}_${FileSize}.txt" -replace '[^a-zA-Z0-9_.]', '_'
     
     # Handle SAS URL (contains ?) vs plain container URL
     if ($AzureContainer -match '\?') {
@@ -160,7 +159,7 @@ function Send-ToAzure {
 function Send-ToAwsS3 {
     param([string]$FilePath, [string]$FileSize, [string]$Method)
 
-    $objectKey = "${Method}_${FileSize}.bin" -replace '[^a-zA-Z0-9_.]', '_'
+    $objectKey = "${Method}_${FileSize}.txt" -replace '[^a-zA-Z0-9_.]', '_'
     $uri = "$AwsBucket/$objectKey"
 
     # AWS S3 headers for public bucket
@@ -180,7 +179,7 @@ function Send-ToAwsS3 {
 function Send-ToGcp {
     param([string]$FilePath, [string]$FileSize, [string]$Method)
 
-    $objectName = "${Method}_${FileSize}.bin" -replace '[^a-zA-Z0-9_.]', '_'
+    $objectName = "${Method}_${FileSize}.txt" -replace '[^a-zA-Z0-9_.]', '_'
     $encodedName = [System.Uri]::EscapeDataString($objectName)
     $uri = "$GcpBucket/$encodedName"
 
