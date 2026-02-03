@@ -66,27 +66,38 @@ function Invoke-Upload {
     try {
         switch ($Method) {
             "Invoke-WebRequest" {
-                $response = Invoke-WebRequest -Uri $Uri -Method $HttpMethod -Headers $Headers -InFile $FilePath -UseBasicParsing
+                $response = Invoke-WebRequest -Method $HttpMethod -Headers $Headers -InFile $FilePath -Uri $Uri -UseBasicParsing
                 $statusCode = $response.StatusCode
             }
             "curl" {
-                $response = curl -Uri $Uri -Method $HttpMethod -Headers $Headers -InFile $FilePath -UseBasicParsing
-                $statusCode = $response.StatusCode
+                # Native curl.exe syntax
+                $headerArgs = @()
+                foreach ($key in $Headers.Keys) {
+                    $headerArgs += "-H"
+                    $headerArgs += "${key}: $($Headers[$key])"
+                }
+                $result = & curl.exe -X $HttpMethod --data-binary "@$FilePath" @headerArgs "$Uri" -w "%{http_code}" -s -o NUL
+                $statusCode = [int]$result
             }
             "iwr" {
-                $response = iwr -Uri $Uri -Method $HttpMethod -Headers $Headers -InFile $FilePath -UseBasicParsing
+                $response = iwr -Method $HttpMethod -Headers $Headers -InFile $FilePath -Uri $Uri -UseBasicParsing
                 $statusCode = $response.StatusCode
             }
             "wget" {
-                $response = wget -Uri $Uri -Method $HttpMethod -Headers $Headers -InFile $FilePath -UseBasicParsing
-                $statusCode = $response.StatusCode
+                # Native wget.exe syntax
+                $headerArgs = @()
+                foreach ($key in $Headers.Keys) {
+                    $headerArgs += "--header=${key}: $($Headers[$key])"
+                }
+                & wget.exe --method=$HttpMethod --body-file="$FilePath" @headerArgs "$Uri" -q -O NUL 2>$null
+                $statusCode = if ($LASTEXITCODE -eq 0) { 200 } else { $LASTEXITCODE }
             }
             "Invoke-RestMethod" {
-                Invoke-RestMethod -Uri $Uri -Method $HttpMethod -Headers $Headers -InFile $FilePath
+                Invoke-RestMethod -Method $HttpMethod -Headers $Headers -InFile $FilePath -Uri $Uri
                 $statusCode = 200
             }
             "irm" {
-                irm -Uri $Uri -Method $HttpMethod -Headers $Headers -InFile $FilePath
+                irm -Method $HttpMethod -Headers $Headers -InFile $FilePath -Uri $Uri
                 $statusCode = 200
             }
         }
