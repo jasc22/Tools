@@ -11,9 +11,9 @@
 #>
 
 param(
-    [string]$AzureContainer = "https://mystorageaccount.blob.core.windows.net/container?sv=2021-06-08&ss=b&srt=o&sp=rwdlacx&se=...",
-    [string]$AwsBucket = "https://my-public-bucket.s3.us-east-1.amazonaws.com",
-    [string]$GcpBucket = "https://storage.googleapis.com/my-public-bucket",
+    [string]$AzureContainer = "",
+    [string]$AwsBucket = "",
+    [string]$GcpBucket = "",
     [string]$FileDirectory = "C:\TestFiles",
     [int]$TimeoutSeconds = 1800
 )
@@ -37,6 +37,7 @@ function Write-Log {
         "START"   { "Yellow" }
         "END"     { "Green" }
         "ERROR"   { "Red" }
+        "WARNING" { "Yellow" }
         default   { "White" }
     }
     Write-Host "[$ts] [$Level] $Message" -ForegroundColor $color
@@ -60,11 +61,14 @@ function Invoke-Upload {
     Write-Log "=== $Provider Upload: $FileSize using $Method ===" -Level "START"
     Write-Log "File: $fileName ($fileSizeBytes bytes)"
     Write-Log "Target URI: $Uri"
-    Write-Log "Headers: $($Headers | ConvertTo-Json -Compress)"
     Write-Log "Timeout: $Timeout seconds"
 
     $startTime = Get-Date
     Write-Log "Upload started"
+
+    # Print headers definition for copy/paste
+    $headerDef = ($Headers.GetEnumerator() | ForEach-Object { "`"$($_.Key)`" = `"$($_.Value)`"" }) -join "; "
+    Write-Log "`$headers = @{$headerDef}"
 
     try {
         switch ($Method) {
@@ -220,6 +224,12 @@ function Send-ToGcp {
 Write-Host "`n===== Cloud Storage Upload Script =====" -ForegroundColor Cyan
 Write-Host "Started: $(Get-Timestamp)`n" -ForegroundColor Cyan
 
+# Check at least one provider is specified
+if (-not $AzureContainer -and -not $AwsBucket -and -not $GcpBucket) {
+    Write-Log "No cloud storage specified. Use -AzureContainer, -AwsBucket, or -GcpBucket" -Level "ERROR"
+    exit 1
+}
+
 # Verify files exist
 foreach ($size in $Files.Keys) {
     if (-not (Test-Path $Files[$size])) {
@@ -232,39 +242,55 @@ $methods = @("Invoke-WebRequest", "curl", "iwr", "wget", "Invoke-RestMethod", "i
 $results = @()
 
 # Azure uploads
-Write-Host "`n----- AZURE BLOB STORAGE -----`n" -ForegroundColor Magenta
-foreach ($method in $methods) {
-    foreach ($size in @("5MB", "10MB", "1GB")) {
-        $results += Send-ToAzure -FilePath $Files[$size] -FileSize $size -Method $method
-        Write-Host ""
+if ($AzureContainer) {
+    Write-Host "`n----- AZURE BLOB STORAGE -----`n" -ForegroundColor Magenta
+    foreach ($method in $methods) {
+        foreach ($size in @("5MB", "10MB", "1GB")) {
+            $results += Send-ToAzure -FilePath $Files[$size] -FileSize $size -Method $method
+            Write-Host ""
+        }
     }
+} else {
+    Write-Log "Skipping Azure - no container specified" -Level "INFO"
 }
 
 # AWS S3 uploads
-Write-Host "`n----- AWS S3 -----`n" -ForegroundColor Magenta
-foreach ($method in $methods) {
-    foreach ($size in @("5MB", "10MB", "1GB")) {
-        $results += Send-ToAwsS3 -FilePath $Files[$size] -FileSize $size -Method $method
-        Write-Host ""
+if ($AwsBucket) {
+    Write-Host "`n----- AWS S3 -----`n" -ForegroundColor Magenta
+    foreach ($method in $methods) {
+        foreach ($size in @("5MB", "10MB", "1GB")) {
+            $results += Send-ToAwsS3 -FilePath $Files[$size] -FileSize $size -Method $method
+            Write-Host ""
+        }
     }
+} else {
+    Write-Log "Skipping AWS S3 - no bucket specified" -Level "INFO"
 }
 
 # GCP uploads
-Write-Host "`n----- GCP CLOUD STORAGE -----`n" -ForegroundColor Magenta
-foreach ($method in $methods) {
-    foreach ($size in @("5MB", "10MB", "1GB")) {
-        $results += Send-ToGcp -FilePath $Files[$size] -FileSize $size -Method $method
-        Write-Host ""
+if ($GcpBucket) {
+    Write-Host "`n----- GCP CLOUD STORAGE -----`n" -ForegroundColor Magenta
+    foreach ($method in $methods) {
+        foreach ($size in @("5MB", "10MB", "1GB")) {
+            $results += Send-ToGcp -FilePath $Files[$size] -FileSize $size -Method $method
+            Write-Host ""
+        }
     }
+} else {
+    Write-Log "Skipping GCP - no bucket specified" -Level "INFO"
 }
 
 # Summary
 Write-Host "`n===== UPLOAD SUMMARY =====" -ForegroundColor Cyan
 Write-Host "Completed: $(Get-Timestamp)`n" -ForegroundColor Cyan
 
-$results | Format-Table -AutoSize Provider, Method, FileSize, Status, Duration, Throughput, StartTime, EndTime
+if ($results.Count -gt 0) {
+    $results | Format-Table -AutoSize Provider, Method, FileSize, Status, Duration, Throughput, StartTime, EndTime
 
-$successful = ($results | Where-Object { $_.Status -ne "FAILED" }).Count
-Write-Host "`nTotal: $successful/$($results.Count) uploads successful" -ForegroundColor $(if ($successful -eq $results.Count) { "Green" } else { "Yellow" })
+    $successful = ($results | Where-Object { $_.Status -ne "FAILED" }).Count
+    Write-Host "`nTotal: $successful/$($results.Count) uploads successful" -ForegroundColor $(if ($successful -eq $results.Count) { "Green" } else { "Yellow" })
+} else {
+    Write-Log "No uploads were performed" -Level "WARNING"
+}
 
 #endregion
