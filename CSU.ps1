@@ -11,7 +11,7 @@
 #>
 
 param(
-    [string]$AzureContainer = "https://mystorageaccount.blob.core.windows.net/public",
+    [string]$AzureContainer = "https://mystorageaccount.blob.core.windows.net/container?sv=2021-06-08&ss=b&srt=o&sp=rwdlacx&se=...",
     [string]$AwsBucket = "https://my-public-bucket.s3.us-east-1.amazonaws.com",
     [string]$GcpBucket = "https://storage.googleapis.com/my-public-bucket",
     [string]$FileDirectory = "C:\TestFiles"
@@ -134,13 +134,19 @@ function Send-ToAzure {
     param([string]$FilePath, [string]$FileSize, [string]$Method)
 
     $blobName = "${Method}_${FileSize}.bin" -replace '[^a-zA-Z0-9_.]', '_'
-    $uri = "$AzureContainer/$blobName"
+    
+    # Handle SAS URL (contains ?) vs plain container URL
+    if ($AzureContainer -match '\?') {
+        # SAS URL: insert blob name before the query string
+        $uri = $AzureContainer -replace '\?', "/$blobName?"
+    } else {
+        # Plain URL: append blob name
+        $uri = "$AzureContainer/$blobName"
+    }
 
-    # Azure Blob Storage headers for public container
+    # Azure Blob Storage headers for SAS URL upload
     $headers = @{
         "x-ms-blob-type" = "BlockBlob"
-        "x-ms-version"   = "2021-06-08"
-        "Content-Type"   = "application/octet-stream"
     }
 
     return Invoke-Upload -Provider "Azure" -Method $Method -FilePath $FilePath `
