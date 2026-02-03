@@ -70,15 +70,18 @@ function Invoke-Upload {
     $startTime = Get-Date
     Write-Log "Upload started"
 
-    # Build inline headers string for copy/paste
+    # Build inline headers string for display and set at script scope
     $headerDef = ($Headers.GetEnumerator() | ForEach-Object { "`"$($_.Key)`" = `"$($_.Value)`"" }) -join "; "
     Write-Log "`$headers = @{$headerDef}"
+    
+    # Set $headers at global scope so it's available
+    $global:headers = $Headers
 
     try {
         switch ($Method) {
             "Invoke-WebRequest" {
                 Write-Log "Command: Invoke-WebRequest -Method $HttpMethod -Headers `$headers -InFile `"$FilePath`" -Uri `"$Uri`" -UseBasicParsing -TimeoutSec $Timeout"
-                $response = Invoke-WebRequest -Method $HttpMethod -Headers $Headers -InFile $FilePath -Uri $Uri -UseBasicParsing -TimeoutSec $Timeout
+                $response = Invoke-WebRequest -Method $HttpMethod -Headers $global:headers -InFile $FilePath -Uri $Uri -UseBasicParsing -TimeoutSec $Timeout
                 $statusCode = $response.StatusCode
             }
             "curl" {
@@ -95,7 +98,7 @@ function Invoke-Upload {
             }
             "iwr" {
                 Write-Log "Command: iwr -Method $HttpMethod -Headers `$headers -InFile `"$FilePath`" -Uri `"$Uri`" -UseBasicParsing -TimeoutSec $Timeout"
-                $response = iwr -Method $HttpMethod -Headers $Headers -InFile $FilePath -Uri $Uri -UseBasicParsing -TimeoutSec $Timeout
+                $response = iwr -Method $HttpMethod -Headers $global:headers -InFile $FilePath -Uri $Uri -UseBasicParsing -TimeoutSec $Timeout
                 $statusCode = $response.StatusCode
             }
             "wget" {
@@ -111,12 +114,12 @@ function Invoke-Upload {
             }
             "Invoke-RestMethod" {
                 Write-Log "Command: Invoke-RestMethod -Method $HttpMethod -Headers `$headers -InFile `"$FilePath`" -Uri `"$Uri`" -TimeoutSec $Timeout"
-                Invoke-RestMethod -Method $HttpMethod -Headers $Headers -InFile $FilePath -Uri $Uri -TimeoutSec $Timeout
+                Invoke-RestMethod -Method $HttpMethod -Headers $global:headers -InFile $FilePath -Uri $Uri -TimeoutSec $Timeout
                 $statusCode = 200
             }
             "irm" {
                 Write-Log "Command: irm -Method $HttpMethod -Headers `$headers -InFile `"$FilePath`" -Uri `"$Uri`" -TimeoutSec $Timeout"
-                irm -Method $HttpMethod -Headers $Headers -InFile $FilePath -Uri $Uri -TimeoutSec $Timeout
+                irm -Method $HttpMethod -Headers $global:headers -InFile $FilePath -Uri $Uri -TimeoutSec $Timeout
                 $statusCode = 200
             }
         }
