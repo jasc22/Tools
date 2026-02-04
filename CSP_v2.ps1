@@ -28,12 +28,30 @@ if ($AzureContainer) {
             
             try {
                 switch ($method) {
-                    "Invoke-WebRequest" { Invoke-WebRequest -Method Put -Headers $headers -InFile $file -Uri $uri -UseBasicParsing | Out-Null }
-                    "curl" { curl.exe -X PUT --data-binary "@$file" -H "x-ms-blob-type: BlockBlob" "$uri" -s -o NUL }
-                    "iwr" { iwr -Method Put -Headers $headers -InFile $file -Uri $uri -UseBasicParsing | Out-Null }
-                    "wget" { wget.exe --method=PUT --body-file="$file" --header="x-ms-blob-type: BlockBlob" "$uri" -q -O NUL 2>$null }
-                    "Invoke-RestMethod" { Invoke-RestMethod -Method Put -Headers $headers -InFile $file -Uri $uri }
-                    "irm" { irm -Method Put -Headers $headers -InFile $file -Uri $uri }
+                    "Invoke-WebRequest" {
+                        Write-Host "Invoke-WebRequest -Method Put -Headers @{`"x-ms-blob-type`"=`"BlockBlob`"} -InFile `"$file`" -Uri `"$uri`" -UseBasicParsing"
+                        Invoke-WebRequest -Method Put -Headers $headers -InFile $file -Uri $uri -UseBasicParsing | Out-Null
+                    }
+                    "curl" {
+                        Write-Host "curl.exe -X PUT --data-binary `"@$file`" -H `"x-ms-blob-type: BlockBlob`" `"$uri`""
+                        curl.exe -X PUT --data-binary "@$file" -H "x-ms-blob-type: BlockBlob" "$uri" -s -o NUL
+                    }
+                    "iwr" {
+                        Write-Host "iwr -Method Put -Headers @{`"x-ms-blob-type`"=`"BlockBlob`"} -InFile `"$file`" -Uri `"$uri`" -UseBasicParsing"
+                        iwr -Method Put -Headers $headers -InFile $file -Uri $uri -UseBasicParsing | Out-Null
+                    }
+                    "wget" {
+                        Write-Host "wget.exe --method=PUT --body-file=`"$file`" --header=`"x-ms-blob-type: BlockBlob`" `"$uri`""
+                        wget.exe --method=PUT --body-file="$file" --header="x-ms-blob-type: BlockBlob" "$uri" -q -O NUL 2>$null
+                    }
+                    "Invoke-RestMethod" {
+                        Write-Host "Invoke-RestMethod -Method Put -Headers @{`"x-ms-blob-type`"=`"BlockBlob`"} -InFile `"$file`" -Uri `"$uri`""
+                        Invoke-RestMethod -Method Put -Headers $headers -InFile $file -Uri $uri
+                    }
+                    "irm" {
+                        Write-Host "irm -Method Put -Headers @{`"x-ms-blob-type`"=`"BlockBlob`"} -InFile `"$file`" -Uri `"$uri`""
+                        irm -Method Put -Headers $headers -InFile $file -Uri $uri
+                    }
                 }
                 Write-Host "End: $(Get-Date -Format 'HH:mm:ss.fff') - SUCCESS" -ForegroundColor Green
             }
@@ -61,12 +79,30 @@ if ($AwsBucket) {
             
             try {
                 switch ($method) {
-                    "Invoke-WebRequest" { Invoke-WebRequest -Method Put -Headers $headers -InFile $file -Uri $uri -UseBasicParsing | Out-Null }
-                    "curl" { curl.exe -X PUT --data-binary "@$file" -H "Content-Type: text/plain" "$uri" -s -o NUL }
-                    "iwr" { iwr -Method Put -Headers $headers -InFile $file -Uri $uri -UseBasicParsing | Out-Null }
-                    "wget" { wget.exe --method=PUT --body-file="$file" --header="Content-Type: text/plain" "$uri" -q -O NUL 2>$null }
-                    "Invoke-RestMethod" { Invoke-RestMethod -Method Put -Headers $headers -InFile $file -Uri $uri }
-                    "irm" { irm -Method Put -Headers $headers -InFile $file -Uri $uri }
+                    "Invoke-WebRequest" {
+                        Write-Host "Invoke-WebRequest -Method Put -Headers @{`"Content-Type`"=`"text/plain`"} -InFile `"$file`" -Uri `"$uri`" -UseBasicParsing"
+                        Invoke-WebRequest -Method Put -Headers $headers -InFile $file -Uri $uri -UseBasicParsing | Out-Null
+                    }
+                    "curl" {
+                        Write-Host "curl.exe -X PUT --data-binary `"@$file`" -H `"Content-Type: text/plain`" `"$uri`""
+                        curl.exe -X PUT --data-binary "@$file" -H "Content-Type: text/plain" "$uri" -s -o NUL
+                    }
+                    "iwr" {
+                        Write-Host "iwr -Method Put -Headers @{`"Content-Type`"=`"text/plain`"} -InFile `"$file`" -Uri `"$uri`" -UseBasicParsing"
+                        iwr -Method Put -Headers $headers -InFile $file -Uri $uri -UseBasicParsing | Out-Null
+                    }
+                    "wget" {
+                        Write-Host "wget.exe --method=PUT --body-file=`"$file`" --header=`"Content-Type: text/plain`" `"$uri`""
+                        wget.exe --method=PUT --body-file="$file" --header="Content-Type: text/plain" "$uri" -q -O NUL 2>$null
+                    }
+                    "Invoke-RestMethod" {
+                        Write-Host "Invoke-RestMethod -Method Put -Headers @{`"Content-Type`"=`"text/plain`"} -InFile `"$file`" -Uri `"$uri`""
+                        Invoke-RestMethod -Method Put -Headers $headers -InFile $file -Uri $uri
+                    }
+                    "irm" {
+                        Write-Host "irm -Method Put -Headers @{`"Content-Type`"=`"text/plain`"} -InFile `"$file`" -Uri `"$uri`""
+                        irm -Method Put -Headers $headers -InFile $file -Uri $uri
+                    }
                 }
                 Write-Host "End: $(Get-Date -Format 'HH:mm:ss.fff') - SUCCESS" -ForegroundColor Green
             }
@@ -94,12 +130,30 @@ if ($GcpBucket) {
             
             try {
                 switch ($method) {
-                    "Invoke-WebRequest" { Invoke-WebRequest -Method Put -Headers $headers -InFile $file -Uri $uri -UseBasicParsing | Out-Null }
-                    "curl" { curl.exe -X PUT --data-binary "@$file" -H "Content-Type: text/plain" "$uri" -s -o NUL }
-                    "iwr" { iwr -Method Put -Headers $headers -InFile $file -Uri $uri -UseBasicParsing | Out-Null }
-                    "wget" { wget.exe --method=PUT --body-file="$file" --header="Content-Type: text/plain" "$uri" -q -O NUL 2>$null }
-                    "Invoke-RestMethod" { Invoke-RestMethod -Method Put -Headers $headers -InFile $file -Uri $uri }
-                    "irm" { irm -Method Put -Headers $headers -InFile $file -Uri $uri }
+                    "Invoke-WebRequest" {
+                        Write-Host "Invoke-WebRequest -Method Put -Headers @{`"Content-Type`"=`"text/plain`"} -InFile `"$file`" -Uri `"$uri`" -UseBasicParsing"
+                        Invoke-WebRequest -Method Put -Headers $headers -InFile $file -Uri $uri -UseBasicParsing | Out-Null
+                    }
+                    "curl" {
+                        Write-Host "curl.exe -X PUT --data-binary `"@$file`" -H `"Content-Type: text/plain`" `"$uri`""
+                        curl.exe -X PUT --data-binary "@$file" -H "Content-Type: text/plain" "$uri" -s -o NUL
+                    }
+                    "iwr" {
+                        Write-Host "iwr -Method Put -Headers @{`"Content-Type`"=`"text/plain`"} -InFile `"$file`" -Uri `"$uri`" -UseBasicParsing"
+                        iwr -Method Put -Headers $headers -InFile $file -Uri $uri -UseBasicParsing | Out-Null
+                    }
+                    "wget" {
+                        Write-Host "wget.exe --method=PUT --body-file=`"$file`" --header=`"Content-Type: text/plain`" `"$uri`""
+                        wget.exe --method=PUT --body-file="$file" --header="Content-Type: text/plain" "$uri" -q -O NUL 2>$null
+                    }
+                    "Invoke-RestMethod" {
+                        Write-Host "Invoke-RestMethod -Method Put -Headers @{`"Content-Type`"=`"text/plain`"} -InFile `"$file`" -Uri `"$uri`""
+                        Invoke-RestMethod -Method Put -Headers $headers -InFile $file -Uri $uri
+                    }
+                    "irm" {
+                        Write-Host "irm -Method Put -Headers @{`"Content-Type`"=`"text/plain`"} -InFile `"$file`" -Uri `"$uri`""
+                        irm -Method Put -Headers $headers -InFile $file -Uri $uri
+                    }
                 }
                 Write-Host "End: $(Get-Date -Format 'HH:mm:ss.fff') - SUCCESS" -ForegroundColor Green
             }
