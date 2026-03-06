@@ -1,0 +1,310 @@
+import { useState } from "react";
+
+const SYSTEM_PROMPT = `You are an expert offensive security researcher and penetration tester with deep knowledge across the full attack surface — from web applications and APIs to cloud infrastructure, Active Directory, and AI/ML systems.
+
+## Role & Expertise
+
+You operate with the mindset of a skilled adversary, but in service of defense. Your knowledge spans:
+
+- **Web & API Security**: OWASP Top 10, REST/GraphQL attack surfaces, auth flaws (OAuth, JWT, SAML), business logic abuse, deserialization, SSRF, XXE, SSTI
+- **Network & Infrastructure**: Lateral movement, pivoting, firewall evasion, protocol abuse (SMB, LDAP, Kerberos), C2 frameworks
+- **Active Directory & Windows**: Kerberoasting, AS-REP roasting, DCSync, Pass-the-Hash/Ticket, GPO abuse, ACL exploitation, privilege escalation
+- **Cloud (Azure/AWS/GCP)**: IAM misconfigurations, SSRF to metadata endpoints, managed identity abuse, storage exposure, privilege escalation paths
+- **AI/LLM Systems**: Prompt injection (direct & indirect), jailbreaks, RAG poisoning, model extraction, inference attacks, OWASP LLM Top 10, MITRE ATLAS
+- **Tooling**: Burp Suite, Metasploit, Impacket, BloodHound, Cobalt Strike, Frida, ffuf, nuclei, jwt_tool, Garak, and custom scripting (Python, PowerShell, Bash)
+
+## Operational Approach
+
+1. **Think like an attacker, report like a consultant.** Identify realistic attack chains, not just isolated CVEs.
+2. **Prioritize by impact.** Focus on findings that lead to credential access, privilege escalation, data exfiltration, or lateral movement.
+3. **Assume a defined engagement scope.** Before suggesting techniques, consider rules of engagement, blast radius, and operational security.
+4. **Be methodology-driven.** Follow structured phases: Reconnaissance → Initial Access → Privilege Escalation → Lateral Movement → Impact → Reporting.
+5. **Favor precision over noise.** Targeted, low-detection techniques over shotgun approaches.
+
+## Output Style
+
+- Provide **technical, actionable detail** — commands, payloads, PoC code when helpful
+- Structure findings with: **Vulnerability / Attack Vector / Impact / Evidence / Remediation**
+- When writing exploits or PoCs, include inline comments explaining what each section does
+- Flag when a technique is **high-risk/destructive** and suggest safer alternatives in production environments
+- Reference **CVEs, frameworks (MITRE ATT&CK, ATLAS), and tooling** where relevant
+
+## Boundaries
+
+- You operate within **authorized engagements only** — always ask about scope if unclear
+- You do **not** assist with attacks against systems the user does not have permission to test
+- When a request is ambiguous, **ask for scope confirmation** before proceeding
+- Treat all outputs as **draft material for professional reporting** — not operational playbooks for unauthorized use
+
+## Tone
+
+Direct. Technical. No hand-holding, but thorough when depth matters. Treat the user as a skilled peer.`;
+
+export default function SystemPromptViewer() {
+  const [copied, setCopied] = useState(false);
+  const [activeSection, setActiveSection] = useState(null);
+
+  const sections = [
+    { id: "role", label: "Role & Expertise", icon: "⬡" },
+    { id: "approach", label: "Operational Approach", icon: "⬡" },
+    { id: "output", label: "Output Style", icon: "⬡" },
+    { id: "boundaries", label: "Boundaries", icon: "⬡" },
+    { id: "tone", label: "Tone", icon: "⬡" },
+  ];
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(SYSTEM_PROMPT);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div style={{
+      minHeight: "100vh",
+      background: "#0a0c10",
+      color: "#c9d1d9",
+      fontFamily: "'JetBrains Mono', 'Fira Code', 'Courier New', monospace",
+      padding: "0",
+    }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Syne:wght@400;600;700;800&display=swap');
+
+        * { box-sizing: border-box; }
+
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: #0a0c10; }
+        ::-webkit-scrollbar-thumb { background: #30363d; border-radius: 2px; }
+
+        .prompt-block {
+          background: #0d1117;
+          border: 1px solid #21262d;
+          border-radius: 8px;
+          padding: 28px 32px;
+          white-space: pre-wrap;
+          font-size: 13px;
+          line-height: 1.8;
+          color: #e6edf3;
+          letter-spacing: 0.01em;
+        }
+
+        .copy-btn {
+          background: transparent;
+          border: 1px solid #30363d;
+          color: #8b949e;
+          padding: 8px 18px;
+          border-radius: 6px;
+          font-family: inherit;
+          font-size: 12px;
+          cursor: pointer;
+          transition: all 0.15s ease;
+          letter-spacing: 0.05em;
+          text-transform: uppercase;
+        }
+        .copy-btn:hover { border-color: #f0883e; color: #f0883e; background: rgba(240,136,62,0.06); }
+        .copy-btn.success { border-color: #3fb950; color: #3fb950; background: rgba(63,185,80,0.06); }
+
+        .tag {
+          display: inline-block;
+          padding: 2px 10px;
+          border-radius: 20px;
+          font-size: 11px;
+          font-weight: 600;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+        }
+
+        .section-pill {
+          padding: 6px 14px;
+          border: 1px solid #21262d;
+          border-radius: 20px;
+          font-size: 11px;
+          cursor: pointer;
+          transition: all 0.15s ease;
+          background: transparent;
+          color: #8b949e;
+          font-family: inherit;
+          letter-spacing: 0.04em;
+        }
+        .section-pill:hover { border-color: #388bfd; color: #388bfd; background: rgba(56,139,253,0.06); }
+        .section-pill.active { border-color: #388bfd; color: #388bfd; background: rgba(56,139,253,0.1); }
+
+        .keyword { color: #ff7b72; }
+        .string { color: #a5d6ff; }
+        .comment { color: #8b949e; font-style: italic; }
+        .heading { color: #f0883e; font-weight: 600; }
+        .bullet { color: #3fb950; }
+        .number { color: #79c0ff; }
+
+        .glow-line {
+          height: 1px;
+          background: linear-gradient(90deg, transparent, #f0883e44, #388bfd44, transparent);
+          margin: 0;
+        }
+
+        .stat-card {
+          background: #0d1117;
+          border: 1px solid #21262d;
+          border-radius: 8px;
+          padding: 16px 20px;
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+        }
+      `}</style>
+
+      {/* Header */}
+      <div style={{
+        borderBottom: "1px solid #21262d",
+        padding: "20px 40px",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        background: "#0d1117",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+          <div style={{
+            width: 36, height: 36,
+            background: "linear-gradient(135deg, #f0883e, #ff7b72)",
+            borderRadius: 8,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: 16,
+          }}>⚔</div>
+          <div>
+            <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 15, fontWeight: 700, color: "#e6edf3", letterSpacing: "0.02em" }}>
+              OFFSEC RESEARCHER
+            </div>
+            <div style={{ fontSize: 11, color: "#8b949e", letterSpacing: "0.06em" }}>SYSTEM PROMPT v1.0</div>
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <span className="tag" style={{ background: "rgba(63,185,80,0.1)", color: "#3fb950", border: "1px solid rgba(63,185,80,0.3)" }}>
+            Production Ready
+          </span>
+          <button className={`copy-btn ${copied ? "success" : ""}`} onClick={handleCopy}>
+            {copied ? "✓ Copied" : "Copy Prompt"}
+          </button>
+        </div>
+      </div>
+
+      <div className="glow-line" />
+
+      <div style={{ padding: "32px 40px", maxWidth: 1000, margin: "0 auto" }}>
+
+        {/* Stats row */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 32 }}>
+          {[
+            { label: "Domains Covered", value: "6", sub: "attack surfaces" },
+            { label: "Methodology", value: "5-Phase", sub: "structured recon→impact" },
+            { label: "Frameworks", value: "ATT&CK + ATLAS", sub: "OWASP LLM Top 10" },
+            { label: "Output Format", value: "Consultant-grade", sub: "structured findings" },
+          ].map((s, i) => (
+            <div className="stat-card" key={i}>
+              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 700, color: "#e6edf3" }}>{s.value}</div>
+              <div style={{ fontSize: 11, color: "#f0883e", letterSpacing: "0.06em", textTransform: "uppercase", fontWeight: 600 }}>{s.label}</div>
+              <div style={{ fontSize: 11, color: "#8b949e" }}>{s.sub}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Section filter pills */}
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 20 }}>
+          <span style={{ fontSize: 12, color: "#8b949e", alignSelf: "center", marginRight: 4 }}>Jump to:</span>
+          {sections.map(s => (
+            <button
+              key={s.id}
+              className={`section-pill ${activeSection === s.id ? "active" : ""}`}
+              onClick={() => {
+                document.getElementById(s.id)?.scrollIntoView({ behavior: "smooth", block: "center" });
+                setActiveSection(s.id);
+                setTimeout(() => setActiveSection(null), 2000);
+              }}
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Rendered prompt with syntax highlighting */}
+        <div className="prompt-block">
+          {SYSTEM_PROMPT.split("\n").map((line, i) => {
+            if (line.startsWith("## ")) {
+              const sectionMap = {
+                "## Role & Expertise": "role",
+                "## Operational Approach": "approach",
+                "## Output Style": "output",
+                "## Boundaries": "boundaries",
+                "## Tone": "tone",
+              };
+              const id = sectionMap[line];
+              return (
+                <div key={i} id={id} style={{ marginTop: i > 0 ? 8 : 0 }}>
+                  <span className="heading">{line}</span>{"\n"}
+                </div>
+              );
+            }
+            if (line.match(/^\d+\./)) {
+              const [num, ...rest] = line.split(". ");
+              const restStr = rest.join(". ");
+              const boldMatch = restStr.match(/^(\*\*[^*]+\*\*)(.*)$/);
+              return (
+                <span key={i}>
+                  <span className="number">{num}.</span>{" "}
+                  {boldMatch ? (
+                    <>
+                      <span style={{ color: "#e6edf3", fontWeight: 600 }}>{boldMatch[1].replace(/\*\*/g, "")}</span>
+                      <span>{boldMatch[2]}</span>
+                    </>
+                  ) : restStr}
+                  {"\n"}
+                </span>
+              );
+            }
+            if (line.startsWith("- **")) {
+              const match = line.match(/^- \*\*([^*]+)\*\*: (.*)/);
+              if (match) {
+                return (
+                  <span key={i}>
+                    <span className="bullet">-</span>{" "}
+                    <span style={{ color: "#79c0ff", fontWeight: 600 }}>{match[1]}</span>
+                    <span style={{ color: "#8b949e" }}>: </span>
+                    <span>{match[2]}</span>
+                    {"\n"}
+                  </span>
+                );
+              }
+            }
+            if (line.startsWith("- ")) {
+              return (
+                <span key={i}>
+                  <span className="bullet">-</span>
+                  <span>{line.slice(1)}</span>
+                  {"\n"}
+                </span>
+              );
+            }
+            if (line.startsWith("You ") || line.startsWith("Your ")) {
+              return <span key={i}><span style={{ color: "#a5d6ff" }}>{line}</span>{"\n"}</span>;
+            }
+            return <span key={i}>{line}{"\n"}</span>;
+          })}
+        </div>
+
+        {/* Usage note */}
+        <div style={{
+          marginTop: 24,
+          padding: "16px 20px",
+          background: "rgba(56,139,253,0.05)",
+          border: "1px solid rgba(56,139,253,0.2)",
+          borderRadius: 8,
+          fontSize: 12,
+          color: "#8b949e",
+          lineHeight: 1.7,
+        }}>
+          <span style={{ color: "#388bfd", fontWeight: 600 }}>Usage:</span>{" "}
+          Paste this into the System Prompt field of your AI platform (Claude, GPT-4, etc.) or prepend it to your first message. For Tachyon or API-based workflows, set it as the <span style={{ color: "#a5d6ff" }}>system</span> parameter in your request body. Customize the Boundaries section to match your specific engagement scope and RoE.
+        </div>
+
+      </div>
+    </div>
+  );
+}
