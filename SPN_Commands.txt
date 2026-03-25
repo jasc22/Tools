@@ -1,0 +1,82 @@
+$spn = Get-MgServicePrincipal -Filter "displayName eq 'MyApp'"
+
+# ============================================================
+# 1. DELEGATED PERMISSIONS (OAuth2 Permission Grants)
+#    "On behalf of a user" permissions that have been consented
+# ============================================================
+
+# Raw output
+Get-MgServicePrincipalOAuth2PermissionGrant -ServicePrincipalId $spn.Id -All
+
+# Resolved with resource names
+Get-MgServicePrincipalOAuth2PermissionGrant -ServicePrincipalId $spn.Id -All | ForEach-Object {
+    $resource = Get-MgServicePrincipal -ServicePrincipalId $_.ResourceId
+    [PSCustomObject]@{
+        Resource    = $resource.DisplayName
+        Scopes      = $_.Scope
+        ConsentType = $_.ConsentType   # AllPrincipals = admin consent, Principal = user consent
+        PrincipalId = $_.PrincipalId   # null for admin consent, user ID for user consent
+    }
+} | Format-Table -AutoSize
+
+
+# ============================================================
+# 2. APPLICATION PERMISSIONS (App Role Assignments)
+#    Direct permissions the SPN exercises without a user
+# ============================================================
+
+# Raw output
+Get-MgServicePrincipalAppRoleAssignment -ServicePrincipalId $spn.Id -All
+
+# Resolved with permission names
+Get-MgServicePrincipalAppRoleAssignment -ServicePrincipalId $spn.Id -All | ForEach-Object {
+    $resource = Get-MgServicePrincipal -ServicePrincipalId $_.ResourceId
+    $role = $resource.AppRoles | Where-Object { $_.Id -eq $_.AppRoleId }
+    [PSCustomObject]@{
+        Resource    = $resource.DisplayName
+        Permission  = $role.Value
+        Description = $role.Description
+        RoleId      = $_.AppRoleId
+    }
+} | Format-Table -AutoSize
+
+
+# ============================================================
+# 3. DIRECTORY ROLE ASSIGNMENTS
+#    Entra ID admin roles (Global Admin, App Admin, etc.)
+# ============================================================
+
+Get-MgRoleManagementDirectoryRoleAssignment -Filter "principalId eq '$($spn.Id)'" -All | ForEach-Object {
+    $roleDef = Get-MgRoleManagementDirectoryRoleDefinition -UnifiedRoleDefinitionId $_.RoleDefinitionId
+    [PSCustomObject]@{
+        RoleName       = $roleDef.DisplayName
+        DirectoryScope = $_.DirectoryScopeId   # "/" = tenant-wide
+        IsBuiltIn      = $roleDef.IsBuiltIn
+    }
+} | Format-Table -AutoSize
+
+
+# ============================================================
+# 4. WHAT THE APP REGISTRATION DECLARES IT NEEDS
+#    (requested, not necessarily granted)
+# ============================================================
+
+$app = Get-MgApplication -Filter "appId eq '$($spn.AppId)'"
+
+# Required resource access (what's declared in the manifest)
+$app.RequiredResourceAccess | ForEach-Object {
+    $resource = Get-MgServicePrincipal -Filter "appId eq '$($_.ResourceAppId)'"
+    $_.ResourceAccess | ForEach-Object {
+        $perm = if ($_.Type -eq 'Role') {
+            ($resource.AppRoles | Where-Object { $_.Id -eq $_.Id }).Value
+        } else {
+            ($resource.Oauth2PermissionScopes | Where-Object { $_.Id -eq $_.Id }).Value
+        }
+        [PSCustomObject]@{
+            Resource       = $resource.DisplayName
+            PermissionName = $perm
+            Type           = $_.Type   # Role = application, Scope = delegated
+            Id             = $_.Id
+        }
+    }
+} | Format-Table -AutoSize
