@@ -10,3 +10,8 @@ curl -s -H "Metadata:true" "http://169.254.169.254/metadata/identity/oauth2/toke
 
 # Instance metadata - what subscription/resource group is this?
 curl -s -H "Metadata:true" "http://169.254.169.254/metadata/instance?api-version=2021-02-01" | python3 -m json.tool
+
+
+# What else is on the 169.254.128.0/24 range?
+curl -s -H "Metadata:true" http://169.254.169.254/metadata/scheduledevents?api-version=2020-07-01
+curl -s -H "Metadata:true" http://169.254.169.254/metadata/attested/document?api-version=2021-02-01
