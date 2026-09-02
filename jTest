@@ -1,0 +1,45 @@
+Bypass Technique Checks
+
+Each of these should return 401/403 on a patched instance:
+
+Header injection:
+
+bash
+curl -sk -o /dev/null -w "%{http_code}" \
+  -H "X-JFrog-Override-Base-Url: http://127.0.0.1" \
+  https://<TARGET>/artifactory/api/security/users
+
+IP spoof headers:
+
+bash
+curl -sk -o /dev/null -w "%{http_code}" \
+  -H "X-Forwarded-For: 127.0.0.1" \
+  -H "X-Real-IP: 127.0.0.1" \
+  https://<TARGET>/artifactory/api/security/users
+
+Path traversal:
+
+bash
+curl -sk -o /dev/null -w "%{http_code}" \
+  --path-as-is \
+  "https://<TARGET>/artifactory/api/repositories/..;/api/security/users"
+
+Double slash:
+
+bash
+curl -sk -o /dev/null -w "%{http_code}" \
+  --path-as-is \
+  "https://<TARGET>//artifactory//api//security//users"
+
+Path parameter bypass:
+
+bash
+curl -sk -o /dev/null -w "%{http_code}" \
+  "https://<TARGET>/artifactory/api/security/users;jsessionid=x"
+
+Anonymous basic auth:
+
+bash
+curl -sk -o /dev/null -w "%{http_code}" \
+  -H "Authorization: Basic YW5vbnltb3VzOg==" \
+  https://<TARGET>/artifactory/api/system/configuration
