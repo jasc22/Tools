@@ -1,0 +1,11 @@
+$dc = 'dc'
+Get-ADRootDSE -Server $dc |
+  Select-Object dnsHostName, forestName, domainName,
+                isGlobalCatalogReady,      # ← is this a GC?
+                configurationNamingContext, # ← tells you the FOREST ROOT
+                schemaNamingContext,
+                ldapServiceName,
+                fSMORoleOwner,              # ← PDC emulator of that NC
+                currentTime,                # ← time skew
+                supportedLDAPVersion,
+                dsServiceName
