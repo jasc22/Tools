@@ -150,3 +150,25 @@ certutil -store My   # on the DC
 - Snapshot the DC before template edits; `Restart-Service CertSvc` on a live DC briefly interrupts enrollment.
 
 For detection engineering, capture on Kali-side timestamps and correlate with CA events **4886/4887** and DC **4768** (PKINIT) — the SAN-in-request vs. requester mismatch in 4886 is the cleanest signal.
+
+jq -r '
+  ."Certificate Templates"
+  | to_entries[]
+  | select(.value | type == "object")
+  | .value
+  | select(
+      ."Enrollee Supplies Subject" == true
+      and .Enabled == true
+      and ."Requires Manager Approval" == false
+      and ."Authorized Signatures Required" == 0
+      and (
+        ((."Extended Key Usage" // []) | length) == 0
+        or ((."Extended Key Usage" // []) | any(. == "Client Authentication" or . == "PKINIT Client Authentication" or . == "Any Purpose"))
+      )
+    )
+  | [ ."Template Name",
+      ((."Extended Key Usage" // []) | join(",")),
+      ((.Permissions."Enrollment Permissions"."Enrollment Rights" // []) | join(";")),
+      (."Certificate Authorities" | tostring) ]
+  | @tsv
+' 20261120_Certipy.json
